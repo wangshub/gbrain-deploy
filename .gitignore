@@ -1,0 +1,10 @@
+# Runtime
+.env
+credentials/
+backups/
+
+# Docker
+*.tar.gz
+
+# OS
+.DS_Store
