@@ -7,8 +7,18 @@ cd "$(dirname "$0")"
 AGENT_NAME="${1:?Usage: register-agent.sh <agent-name> [scope]}"
 SCOPE="${2:-read write}"
 
-[ -f .env ] || { echo "No .env found. Run ./deploy-docker.sh first." >&2; exit 1; }
-source .env
+# ── Load config — support both Docker and local deploy ──
+LOCAL_ENV="$HOME/.gbrain-deploy/.env.local"
+if [ -f .env ]; then
+  source .env
+  DEPLOY_MODE="docker"
+elif [ -f "$LOCAL_ENV" ]; then
+  set -a; source "$LOCAL_ENV"; set +a
+  DEPLOY_MODE="local"
+else
+  echo "No config found. Run ./deploy-docker.sh or ./deploy-local.sh first." >&2
+  exit 1
+fi
 
 GBRAIN_PORT=${GBRAIN_PORT:-3000}
 ADMIN_SECRET=${GBRAIN_ADMIN_SECRET:?GBRAIN_ADMIN_SECRET not set}
@@ -24,9 +34,10 @@ RESPONSE=$(curl -sf -X POST "http://localhost:${GBRAIN_PORT}/register" \
     echo "Registration failed. gbrain may not support DCR yet."
     echo "Falling back to admin-secret token mode."
     echo ""
+    EXTERNAL_HOST=$(hostname -I 2>/dev/null | awk '{print $1}' || hostname)
     echo "Agent: ${AGENT_NAME}"
     echo "Token: ${ADMIN_SECRET}"
-    echo "Endpoint: http://localhost:${GBRAIN_PORT}/mcp"
+    echo "Endpoint: http://${EXTERNAL_HOST}:${GBRAIN_PORT}/mcp"
     echo "Scope: ${SCOPE}"
     echo ""
     echo "Add to your agent's MCP config:"
@@ -45,7 +56,7 @@ if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
   exit 1
 fi
 
-EXTERNAL_HOST=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "YOUR_SERVER_IP")
+EXTERNAL_HOST=$(hostname -I 2>/dev/null | awk '{print $1}' || hostname)
 
 echo ""
 echo "══════════════════════════════════════════════════"
@@ -70,6 +81,7 @@ cat > "${CREDS_DIR}/${AGENT_NAME}.json" <<EOF
   "client_secret": "${CLIENT_SECRET}",
   "endpoint": "http://${EXTERNAL_HOST}:${GBRAIN_PORT}/mcp",
   "scope": "${SCOPE}",
+  "deploy_mode": "${DEPLOY_MODE}",
   "registered_at": "$(date -Iseconds)"
 }
 EOF
