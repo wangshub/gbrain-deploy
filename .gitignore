@@ -6,5 +6,8 @@ backups/
 # Docker
 *.tar.gz
 
+# Logs
+*.log
+
 # OS
 .DS_Store

@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 AGENT_NAME="${1:?Usage: register-agent.sh <agent-name> [scope]}"
 SCOPE="${2:-read write}"
 
-[ -f .env ] || { echo "No .env found. Run ./deploy.sh first." >&2; exit 1; }
+[ -f .env ] || { echo "No .env found. Run ./deploy-docker.sh first." >&2; exit 1; }
 source .env
 
 GBRAIN_PORT=${GBRAIN_PORT:-3000}

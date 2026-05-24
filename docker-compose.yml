@@ -16,6 +16,16 @@ services:
     networks:
       - gbrain-net
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - gbrain-net
+
   gbrain:
     build:
       context: .
@@ -32,14 +42,21 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-gbrain}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gbrain}
       GBRAIN_HTTP_PORT: "3000"
       GBRAIN_HOST: "0.0.0.0"
-      # Embedding provider — pick one
+      # LLM
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      # Embedding — standard provider keys
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ZEROENTROPY_API_KEY: ${ZEROENTROPY_API_KEY:-}
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
-      # Embedding config (defaults: zeroentropy:zembed-1, 1280d)
-      GBRAIN_EMBEDDING_MODEL: ${GBRAIN_EMBEDDING_MODEL:-}
-      GBRAIN_EMBEDDING_DIMENSIONS: ${GBRAIN_EMBEDDING_DIMENSIONS:-}
-      # OAuth / DCR admin secret
+      # Embedding — gbrain init args
+      EMBEDDING_GBRAIN_SPEC: ${EMBEDDING_GBRAIN_SPEC:-}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-}
+      # Ollama
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      # Admin
       GBRAIN_ADMIN_SECRET: ${GBRAIN_ADMIN_SECRET:?GBRAIN_ADMIN_SECRET is required}
     volumes:
       - brain-repo:/home/gbrain/.gbrain
@@ -49,6 +66,7 @@ services:
 volumes:
   pgdata:
   brain-repo:
+  ollama-data:
 
 networks:
   gbrain-net:
