@@ -31,7 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        GBRAIN_REF: ${GBRAIN_REF:-latest}
+        GBRAIN_REF: ${GBRAIN_REF:-master}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -59,7 +59,7 @@ services:
       # Admin
       GBRAIN_ADMIN_SECRET: ${GBRAIN_ADMIN_SECRET:?GBRAIN_ADMIN_SECRET is required}
     volumes:
-      - brain-repo:/home/gbrain/.gbrain
+      - brain-repo:/root/.gbrain
     networks:
       - gbrain-net
 

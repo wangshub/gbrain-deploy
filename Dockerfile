@@ -1,26 +1,23 @@
-FROM oven/bun:1 AS builder
-
-ARG GBRAIN_REF=latest
-
-RUN bun install -g "github:garrytan/gbrain#${GBRAIN_REF}"
-
 FROM oven/bun:1
 
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+ARG GBRAIN_REF=master
 
-RUN addgroup --system gbrain && adduser --system --ingroup gbrain gbrain
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /root/.bun/install/global /home/gbrain/.bun/install/global
+RUN git clone --depth 1 --branch "${GBRAIN_REF}" https://github.com/garrytan/gbrain.git /opt/gbrain-src \
+    && cd /opt/gbrain-src && bun install \
+    && bun run build 2>/dev/null; true \
+    && bun install -g file:/opt/gbrain-src
 
-ENV PATH="/home/gbrain/.bun/install/global/node_modules/.bin:${PATH}"
-ENV HOME=/home/gbrain
+ENV HOME=/root
 
 COPY scripts/entrypoint.sh /entrypoint.sh
 
-USER gbrain
-WORKDIR /home/gbrain
+WORKDIR /root
 
 EXPOSE 3000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["serve", "--http"]
+CMD ["serve", "--http", "--port", "3000"]

@@ -9,9 +9,6 @@ done
 echo "[entrypoint] PostgreSQL is ready."
 
 # ── Map LLM config to gbrain env vars ───────────────
-# If a custom LLM_API_BASE is set, expose as OPENAI_BASE_URL for
-# gbrain's OpenAI-compatible SDK. Also set OPENAI_API_KEY to the
-# provided key so gbrain picks it up for enrichment/extraction.
 if [ -n "${LLM_API_BASE:-}" ]; then
   export OPENAI_BASE_URL="${LLM_API_BASE}"
 fi
@@ -20,7 +17,7 @@ if [ -n "${LLM_API_KEY:-}" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
 fi
 
 # ── Initialize gbrain ───────────────────────────────
-if [ ! -f /home/gbrain/.gbrain/config.json ]; then
+if [ ! -f /root/.gbrain/config.json ]; then
   echo "[entrypoint] Initializing gbrain..."
   INIT_ARGS=""
   if [ -n "${EMBEDDING_GBRAIN_SPEC:-}" ]; then
@@ -28,6 +25,9 @@ if [ ! -f /home/gbrain/.gbrain/config.json ]; then
   fi
   if [ -n "${EMBEDDING_DIM:-}" ]; then
     INIT_ARGS="$INIT_ARGS --embedding-dimensions ${EMBEDDING_DIM}"
+  fi
+  if [ -z "${EMBEDDING_GBRAIN_SPEC:-}" ] && [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${ZEROENTROPY_API_KEY:-}" ] && [ -z "${VOYAGE_API_KEY:-}" ]; then
+    INIT_ARGS="$INIT_ARGS --no-embedding"
   fi
   # shellcheck disable=SC2086
   gbrain init $INIT_ARGS
