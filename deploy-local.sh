@@ -276,7 +276,7 @@ ADMIN_SECRET=$(prompt_text "Admin secret" "[auto-generated]")
 ADMIN_SECRET="${ADMIN_SECRET:-$ADMIN_SECRET_DEFAULT}"
 [ "$ADMIN_SECRET" = "[auto-generated]" ] && ADMIN_SECRET="$ADMIN_SECRET_DEFAULT"
 
-GBRAIN_REF=$(prompt_text "gbrain version (git ref)" "latest")
+GBRAIN_REF=$(prompt_text "gbrain version (git ref)" "master")
 
 # ══════════════════════════════════════════════════════
 # Step 5: Service
@@ -409,7 +409,7 @@ set -euo pipefail
 ENV_FILE="$HOME/.gbrain-deploy/.env.local"
 [ -f "$ENV_FILE" ] || { echo "Config not found: $ENV_FILE"; exit 1; }
 set -a; source "$ENV_FILE"; set +a
-exec gbrain serve --http --port "${GBRAIN_PORT:-3000}"
+exec gbrain serve --http --port "${GBRAIN_PORT:-3000}" --bind 0.0.0.0
 START_EOF
 chmod +x "${ENV_DIR}/start.sh"
 ok "Start script: ${ENV_DIR}/start.sh"
@@ -429,6 +429,9 @@ fi
 INIT_ARGS=""
 [ -n "${EMBEDDING_GBRAIN_SPEC:-}" ] && INIT_ARGS="$INIT_ARGS --embedding-model ${EMBEDDING_GBRAIN_SPEC}"
 [ -n "${EMBEDDING_DIM:-}" ] && INIT_ARGS="$INIT_ARGS --embedding-dimensions ${EMBEDDING_DIM}"
+if [ -z "${EMBEDDING_GBRAIN_SPEC:-}" ] && [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${ZEROENTROPY_API_KEY:-}" ] && [ -z "${VOYAGE_API_KEY:-}" ]; then
+  INIT_ARGS="$INIT_ARGS --no-embedding"
+fi
 
 # shellcheck disable=SC2086
 gbrain init $INIT_ARGS
@@ -448,7 +451,7 @@ After=network.target postgresql.service
 Type=simple
 User=${USER}
 EnvironmentFile=${ENV_DIR}/.env.local
-ExecStart=${GBRAIN_BIN} serve --http --port ${GBRAIN_PORT}
+ExecStart=${GBRAIN_BIN} serve --http --port ${GBRAIN_PORT} --bind 0.0.0.0
 Restart=on-failure
 RestartSec=5
 WorkingDirectory=${HOME}

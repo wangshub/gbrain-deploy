@@ -18,8 +18,8 @@ echo "  -> ${BACKUP_PATH}/gbrain.sql"
 
 echo "[2/3] Archiving brain repo..."
 docker compose run --rm -v "$(pwd)/${BACKUP_PATH}:/backup" gbrain \
-  tar czf /backup/brain-repo.tar.gz -C /home/gbrain .gbrain 2>/dev/null || \
-  docker cp gbrain-deploy-gbrain-1:/home/gbrain/.gbrain "${BACKUP_PATH}/brain-repo" 2>/dev/null || \
+  tar czf /backup/brain-repo.tar.gz -C /root .gbrain 2>/dev/null || \
+  docker cp gbrain-deploy-gbrain-1:/root/.gbrain "${BACKUP_PATH}/brain-repo" 2>/dev/null || \
   echo "  [skip] brain repo volume empty or service not running"
 echo "  -> ${BACKUP_PATH}/"
 

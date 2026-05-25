@@ -211,7 +211,7 @@ ADMIN_SECRET=$(prompt_text "Admin secret" "[auto-generated]")
 ADMIN_SECRET="${ADMIN_SECRET:-$ADMIN_SECRET_DEFAULT}"
 [ "$ADMIN_SECRET" = "[auto-generated]" ] && ADMIN_SECRET="$ADMIN_SECRET_DEFAULT"
 
-GBRAIN_REF=$(prompt_text "gbrain version (git ref)" "latest")
+GBRAIN_REF=$(prompt_text "gbrain version (git ref)" "master")
 
 # ══════════════════════════════════════════════════════
 # Summary & Confirm

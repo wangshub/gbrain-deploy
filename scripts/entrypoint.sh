@@ -16,6 +16,16 @@ if [ -n "${LLM_API_KEY:-}" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
   export OPENAI_API_KEY="${LLM_API_KEY}"
 fi
 
+# ── Set admin bootstrap token if strong enough ───────
+if [ -n "${GBRAIN_ADMIN_SECRET:-}" ]; then
+  if printf '%s' "${GBRAIN_ADMIN_SECRET}" | grep -qE '^[A-Za-z0-9_-]{32,}$'; then
+    export GBRAIN_ADMIN_BOOTSTRAP_TOKEN="${GBRAIN_ADMIN_SECRET}"
+  else
+    echo "[entrypoint] GBRAIN_ADMIN_SECRET too weak for bootstrap token (need 32+ chars, [A-Za-z0-9_-])."
+    echo "[entrypoint] gbrain will auto-generate one — check logs."
+  fi
+fi
+
 # ── Initialize gbrain ───────────────────────────────
 if [ ! -f /root/.gbrain/config.json ]; then
   echo "[entrypoint] Initializing gbrain..."

@@ -27,7 +27,7 @@ docker compose exec -T postgres \
 echo "[3/3] Restoring brain repo..."
 if [ -f "${BACKUP_PATH}/brain-repo.tar.gz" ]; then
   docker compose run --rm -v "$(pwd)/${BACKUP_PATH}:/backup" gbrain \
-    tar xzf /backup/brain-repo.tar.gz -C /home/gbrain/ 2>/dev/null || true
+    tar xzf /backup/brain-repo.tar.gz -C /root/ 2>/dev/null || true
 fi
 
 echo "Starting gbrain..."
