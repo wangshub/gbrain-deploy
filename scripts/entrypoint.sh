@@ -9,7 +9,8 @@ done
 echo "[entrypoint] PostgreSQL is ready."
 
 # ── Map LLM config to gbrain env vars ───────────────
-if [ -n "${LLM_API_BASE:-}" ]; then
+# Only set OPENAI_BASE_URL from LLM if no embedding-specific URL is already set
+if [ -n "${LLM_API_BASE:-}" ] && [ -z "${OPENAI_BASE_URL:-}" ]; then
   export OPENAI_BASE_URL="${LLM_API_BASE}"
 fi
 if [ -n "${LLM_API_KEY:-}" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
@@ -17,12 +18,16 @@ if [ -n "${LLM_API_KEY:-}" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
 fi
 
 # ── Set admin bootstrap token if strong enough ───────
-if [ -n "${GBRAIN_ADMIN_SECRET:-}" ]; then
-  if printf '%s' "${GBRAIN_ADMIN_SECRET}" | grep -qE '^[A-Za-z0-9_-]{32,}$'; then
-    export GBRAIN_ADMIN_BOOTSTRAP_TOKEN="${GBRAIN_ADMIN_SECRET}"
+# In Docker, the token arrives as GBRAIN_ADMIN_BOOTSTRAP_TOKEN (renamed by compose).
+# Validate strength and warn if too weak.
+_BOOTSTRAP_TOKEN="${GBRAIN_ADMIN_BOOTSTRAP_TOKEN:-}"
+if [ -n "$_BOOTSTRAP_TOKEN" ]; then
+  if printf '%s' "$_BOOTSTRAP_TOKEN" | grep -qE '^[A-Za-z0-9_-]{32,}$'; then
+    export GBRAIN_ADMIN_BOOTSTRAP_TOKEN="$_BOOTSTRAP_TOKEN"
   else
-    echo "[entrypoint] GBRAIN_ADMIN_SECRET too weak for bootstrap token (need 32+ chars, [A-Za-z0-9_-])."
+    echo "[entrypoint] WARNING: admin secret too weak for bootstrap token (need 32+ chars, [A-Za-z0-9_-])."
     echo "[entrypoint] gbrain will auto-generate one — check logs."
+    unset GBRAIN_ADMIN_BOOTSTRAP_TOKEN
   fi
 fi
 

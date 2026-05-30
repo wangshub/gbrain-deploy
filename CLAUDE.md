@@ -4,64 +4,95 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-gbrain-deploy is a deployment toolkit for [gbrain](https://github.com/garrytan/gbrain) — a personal/company AI knowledge brain by Garry Tan (Y Combinator). This project provides one-command setup scripts for self-hosting gbrain as an MCP (Model Context Protocol) server, allowing multiple AI agents (Claude Code, Cursor, Hermes, OpenClaw, etc.) to share the same knowledge base.
+gbrain-deploy is a deployment toolkit for [gbrain](https://github.com/garrytan/gbrain) — a personal/company AI knowledge brain by Garry Tan (Y Combinator). This project provides a unified CLI for self-hosting gbrain as an MCP (Model Context Protocol) server, allowing multiple AI agents (Claude Code, Cursor, Hermes, OpenClaw, etc.) to share the same knowledge base.
 
-Two deployment modes: Docker (`deploy-docker.sh`) and native/bare-metal (`deploy-local.sh`). Both produce identical functionality — Docker is for cloud hosts, local is for dev machines and China-region servers (avoids Docker registry issues).
+Two deployment modes: Docker (recommended for cloud hosts) and Local (for dev machines and China-region servers). Both produce identical functionality.
 
 ## Common Commands
 
 ```bash
 # Syntax-check all scripts
-bash -n deploy-docker.sh && bash -n deploy-local.sh && bash -n scripts/entrypoint.sh && bash -n register-agent.sh && bash -n backup.sh && bash -n restore.sh
+for f in gbrain.sh lib/*.sh cmd/*.sh scripts/entrypoint.sh; do bash -n "$f"; done
 
-# Run smoke tests (requires a running deployment)
-bash tests/smoke-test.sh
+# Deploy (interactive wizard)
+./gbrain.sh deploy
 
-# Register a new agent with credentials
-./register-agent.sh <name> "read write"
+# Check service status
+./gbrain.sh status
 
-# Backup (Docker only)
-./backup.sh
+# View logs
+./gbrain.sh logs -f
 
-# Restore (Docker only)
-./restore.sh backups/latest
+# Register a new agent
+./gbrain.sh agents add <name> "read write"
 
-# View Docker logs
+# List registered agents
+./gbrain.sh agents list
+
+# Backup (works for both Docker and Local)
+./gbrain.sh backup
+
+# Restore from backup
+./gbrain.sh restore backups/latest
+
+# Run smoke tests
+./gbrain.sh test
+
+# View/edit configuration
+./gbrain.sh config view
+./gbrain.sh config set GBRAIN_PORT 3001
+
+# Service management
+./gbrain.sh start
+./gbrain.sh stop
+./gbrain.sh restart
+
+# View Docker logs (if using Docker mode)
 docker compose logs -f gbrain
 
-# Restart service (local)
+# Restart service (local, systemd)
 sudo systemctl restart gbrain
 ```
 
 ## Architecture
 
 ```
-deploy-docker.sh / deploy-local.sh
+gbrain.sh (unified CLI entry point)
     │
-    ├── Interactive setup (5-7 steps: DB, LLM, Embedding, Git sync, Server, Service)
+    ├── cmd/deploy.sh — Interactive setup (Docker or Local)
+    │   ├── Docker path:
+    │   │   ├── .env → docker-compose.yml → Dockerfile → entrypoint.sh → gbrain serve
+    │   │   ├── pgvector/pgvector:pg16 (embeddings DB)
+    │   │   └── ollama/ollama (optional, profile-gated)
+    │   │
+    │   └── Local path:
+    │       ├── ~/.gbrain-deploy/.env.local
+    │       ├── systemd service (Linux) or launchd plist (macOS)
+    │       └── gbrain serve --http --port N --bind 0.0.0.0
     │
-    ├── Docker path:
-    │   ├── .env → docker-compose.yml → Dockerfile → entrypoint.sh → gbrain serve
-    │   ├── pgvector/pgvector:pg16 (embeddings DB)
-    │   └── ollama/ollama (optional, profile-gated)
-    │
-    └── Local path:
-        ├── ~/.gbrain-deploy/.env.local
-        ├── systemd service (Linux) or launchd plist (macOS)
-        └── gbrain serve --http --port N --bind 0.0.0.0
+    ├── cmd/status.sh — Service health check
+    ├── cmd/logs.sh — Unified log viewing (Docker/systemd/launchd)
+    ├── cmd/agents.sh — Agent registration and management
+    ├── cmd/backup.sh — Backup database + brain data
+    ├── cmd/restore.sh — Restore from backup
+    ├── cmd/config.sh — Configuration management
+    ├── cmd/service.sh — Start/stop/restart service
+    └── cmd/test.sh — Smoke tests
 ```
 
 **Data flow:** Agents → HTTP MCP endpoint (`/mcp`) → gbrain server → PostgreSQL (pgvector) + brain data directory (`/root/.gbrain` in Docker, `~/.gbrain` local)
 
 **Key components:**
+
+- `lib/common.sh` — Shared functions (colors, prompts, config loading, health checks)
 - `scripts/entrypoint.sh` — Docker container init: waits for Postgres, runs `gbrain init` (first run), `gbrain install` (skills), git repo init + remote pull, then `exec gbrain serve`
-- `register-agent.sh` — Registers agents via DCR (Dynamic Client Registration) or falls back to admin-secret token mode. Saves credentials to `credentials/<name>.json`
 - `docker-compose.yml` — Three services: postgres, ollama (optional), gbrain. Volume `brain-data` persists brain content.
-- `backup.sh` / `restore.sh` — Docker-only backup: pg_dump + brain data tar + .env backup
+- `cmd/` — CLI command implementations
 
 **Config flow:**
-- Docker: `.env` (generated by `deploy-docker.sh`) → passed to compose and container
-- Local: `~/.gbrain-deploy/.env.local` (generated by `deploy-local.sh`) → sourced by systemd service
+
+- Docker: `.env` (generated by `./gbrain.sh deploy`) → passed to compose and container
+- Local: `~/.gbrain-deploy/.env.local` (generated by `./gbrain.sh deploy`) → sourced by systemd service
 
 **Environment variable groups:** Database (POSTGRES_*), LLM (LLM_API_BASE/KEY/MODEL), Embedding (OPENAI/ZeroEntropy/Voyage/Ollama), Git sync (BRAIN_GIT_REMOTE/BRANCH/TOKEN/USER/EMAIL), Server (GBRAIN_PORT/ADMIN_SECRET).
 

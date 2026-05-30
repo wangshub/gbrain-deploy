@@ -56,6 +56,7 @@ services:
       EMBEDDING_DIM: ${EMBEDDING_DIM:-}
       # Ollama
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-}
       # Admin
       GBRAIN_ADMIN_BOOTSTRAP_TOKEN: ${GBRAIN_ADMIN_SECRET:-}
       # Git sync
@@ -64,6 +65,8 @@ services:
       BRAIN_GIT_TOKEN: ${BRAIN_GIT_TOKEN:-}
       BRAIN_GIT_USER: ${BRAIN_GIT_USER:-gbrain}
       BRAIN_GIT_EMAIL: ${BRAIN_GIT_EMAIL:-gbrain@localhost}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - brain-data:/root/.gbrain
     networks:
