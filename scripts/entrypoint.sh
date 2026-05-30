@@ -57,16 +57,16 @@ fi
 # ── Git sync ─────────────────────────────────────────
 BRAIN_DIR="/root/.gbrain"
 
+# Initialize as git repo first (before any git config)
+if [ ! -d "$BRAIN_DIR/.git" ]; then
+  echo "[entrypoint] Initializing git repo in brain directory..."
+  git init "$BRAIN_DIR"
+fi
+
 # Ensure git user is configured
 if [ -z "$(git -C "$BRAIN_DIR" config user.name 2>/dev/null)" ]; then
   git -C "$BRAIN_DIR" config user.name "${BRAIN_GIT_USER:-gbrain}"
   git -C "$BRAIN_DIR" config user.email "${BRAIN_GIT_EMAIL:-gbrain@localhost}"
-fi
-
-# Initialize as git repo if not already
-if [ ! -d "$BRAIN_DIR/.git" ]; then
-  echo "[entrypoint] Initializing git repo in brain directory..."
-  git init "$BRAIN_DIR"
 fi
 
 # Configure remote if specified
