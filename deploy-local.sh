@@ -79,7 +79,7 @@ info "Detected OS: ${OS}"
 # ══════════════════════════════════════════════════════
 # Step 0: Prerequisites
 # ══════════════════════════════════════════════════════
-header "Step 0/5: Prerequisites"
+header "Step 0/6: Prerequisites"
 
 # ── bun ──────────────────────────────────────────────
 if command -v bun >/dev/null 2>&1; then
@@ -151,7 +151,7 @@ fi
 # ══════════════════════════════════════════════════════
 # Step 1: Database
 # ══════════════════════════════════════════════════════
-header "Step 1/5: Database"
+header "Step 1/6: Database"
 
 PG_USER=$(prompt_text "PostgreSQL user" "gbrain")
 PG_DB=$(prompt_text "PostgreSQL database" "gbrain")
@@ -172,7 +172,7 @@ ok "Database URL: ${DB_URL}"
 # ══════════════════════════════════════════════════════
 # Step 2: AI Model (LLM)
 # ══════════════════════════════════════════════════════
-header "Step 2/5: AI Model (for enrichment, extraction, synthesis)"
+header "Step 2/6: AI Model (for enrichment, extraction, synthesis)"
 
 LLM_CHOICE=$(prompt_select "LLM Provider:" \
   "OpenAI (api.openai.com)" \
@@ -207,7 +207,7 @@ esac
 # ══════════════════════════════════════════════════════
 # Step 3: Embedding Model
 # ══════════════════════════════════════════════════════
-header "Step 3/5: Embedding Model (for vector search)"
+header "Step 3/6: Embedding Model (for vector search)"
 
 EMBED_CHOICE=$(prompt_select "Embedding Provider:" \
   "OpenAI" \
@@ -268,7 +268,7 @@ esac
 # ══════════════════════════════════════════════════════
 # Step 4: Server
 # ══════════════════════════════════════════════════════
-header "Step 4/5: Server"
+header "Step 4/6: Server"
 
 GBRAIN_PORT=$(prompt_text "HTTP port" "3000")
 ADMIN_SECRET_DEFAULT=$(gen_secret)
@@ -281,7 +281,7 @@ GBRAIN_REF=$(prompt_text "gbrain version (git ref)" "master")
 # ══════════════════════════════════════════════════════
 # Step 5: Service
 # ══════════════════════════════════════════════════════
-header "Step 5/5: Service"
+header "Step 5/6: Service"
 
 if [ "$OS" = "macos" ]; then
   SERVICE_TYPE="launchd"
@@ -436,6 +436,49 @@ fi
 # shellcheck disable=SC2086
 gbrain init $INIT_ARGS
 ok "gbrain initialized."
+
+# Install skills (60+ skills, 9 skill packs)
+info "Installing gbrain skills..."
+gbrain install || warn "gbrain install failed, some skills may be missing."
+ok "Skills installed."
+
+# ── Git sync setup ──────────────────────────────────
+header "Step 6/6: Git Sync (version control for brain data)"
+
+GBRAIN_DIR="$HOME/.gbrain"
+
+# Ensure git user is configured
+if [ -z "$(git -C "$GBRAIN_DIR" config user.name 2>/dev/null)" ]; then
+  git -C "$GBRAIN_DIR" config user.name "gbrain"
+  git -C "$GBRAIN_DIR" config user.email "gbrain@localhost"
+fi
+
+# Initialize as git repo
+if [ ! -d "$GBRAIN_DIR/.git" ]; then
+  git init "$GBRAIN_DIR"
+  ok "Brain directory initialized as git repo."
+fi
+
+if prompt_yesno "Sync brain data to a remote git repo?" "N"; then
+  BRAIN_GIT_REMOTE=$(prompt_text "Git remote URL" "https://github.com/your-org/your-brain.git")
+  BRAIN_GIT_BRANCH=$(prompt_text "Git branch" "main")
+
+  if git -C "$GBRAIN_DIR" remote get-url origin >/dev/null 2>&1; then
+    git -C "$GBRAIN_DIR" remote set-url origin "$BRAIN_GIT_REMOTE"
+  else
+    git -C "$GBRAIN_DIR" remote add origin "$BRAIN_GIT_REMOTE"
+  fi
+
+  # Save to env for the start script
+  echo "" >> "${ENV_DIR}/.env.local"
+  echo "# Git sync" >> "${ENV_DIR}/.env.local"
+  echo "BRAIN_GIT_REMOTE=${BRAIN_GIT_REMOTE}" >> "${ENV_DIR}/.env.local"
+  echo "BRAIN_GIT_BRANCH=${BRAIN_GIT_BRANCH}" >> "${ENV_DIR}/.env.local"
+
+  ok "Git remote configured: ${BRAIN_GIT_REMOTE}"
+else
+  ok "Git sync skipped. Brain data stored locally with git history."
+fi
 
 # ── Setup Service ───────────────────────────────────
 if [ "$SERVICE_TYPE" = "systemd" ]; then

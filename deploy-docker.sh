@@ -77,7 +77,7 @@ echo -e "${BOLD}╚════════════════════�
 # ══════════════════════════════════════════════════════
 # Step 1: Database
 # ══════════════════════════════════════════════════════
-header "Step 1/4: Database"
+header "Step 1/5: Database"
 
 PG_PASS_DEFAULT=$(gen_secret)
 PG_PASS=$(prompt_text "PostgreSQL password" "[auto-generated]")
@@ -92,7 +92,7 @@ ok "Database: ${PG_USER}@localhost/${PG_DB}"
 # ══════════════════════════════════════════════════════
 # Step 2: AI Model (LLM)
 # ══════════════════════════════════════════════════════
-header "Step 2/4: AI Model (for enrichment, extraction, synthesis)"
+header "Step 2/5: AI Model (for enrichment, extraction, synthesis)"
 
 LLM_CHOICE=$(prompt_select "LLM Provider:" \
   "OpenAI (api.openai.com)" \
@@ -129,7 +129,7 @@ fi
 # ══════════════════════════════════════════════════════
 # Step 3: Embedding Model
 # ══════════════════════════════════════════════════════
-header "Step 3/4: Embedding Model (for vector search)"
+header "Step 3/5: Embedding Model (for vector search)"
 
 EMBED_CHOICE=$(prompt_select "Embedding Provider:" \
   "OpenAI" \
@@ -201,9 +201,33 @@ if [ "$EMBED_PROVIDER" != "skip" ]; then
 fi
 
 # ══════════════════════════════════════════════════════
-# Step 4: Server
+# Step 4: Git Sync (optional)
 # ══════════════════════════════════════════════════════
-header "Step 4/4: Server"
+header "Step 4/5: Git Sync (version control for brain data)"
+
+GIT_PROVIDER="skip"
+if prompt_yesno "Sync brain data to a git repo?" "N"; then
+  BRAIN_GIT_REMOTE=$(prompt_text "Git remote URL" "https://github.com/your-org/your-brain.git")
+  BRAIN_GIT_BRANCH=$(prompt_text "Git branch" "main")
+
+  if prompt_yesno "Use a personal access token for authentication?" "Y"; then
+    BRAIN_GIT_TOKEN=$(prompt_password "Git token (e.g. GitHub PAT)")
+  else
+    BRAIN_GIT_TOKEN=""
+  fi
+
+  BRAIN_GIT_USER=$(prompt_text "Git author name" "gbrain")
+  BRAIN_GIT_EMAIL=$(prompt_text "Git author email" "gbrain@localhost")
+  GIT_PROVIDER="configured"
+  ok "Git sync: ${BRAIN_GIT_REMOTE} (${BRAIN_GIT_BRANCH})"
+else
+  warn "Git sync not configured. Brain data stored in Docker volume only."
+fi
+
+# ══════════════════════════════════════════════════════
+# Step 5: Server
+# ══════════════════════════════════════════════════════
+header "Step 5/5: Server"
 
 GBRAIN_PORT=$(prompt_text "HTTP port" "3000")
 ADMIN_SECRET_DEFAULT=$(gen_secret)
@@ -234,6 +258,9 @@ else
 fi
 echo -e "  ${CYAN}Port:${NC}        ${GBRAIN_PORT}"
 echo -e "  ${CYAN}gbrain ref:${NC}  ${GBRAIN_REF}"
+if [ "$GIT_PROVIDER" != "skip" ]; then
+  echo -e "  ${CYAN}Git sync:${NC}    ${BRAIN_GIT_REMOTE} (${BRAIN_GIT_BRANCH})"
+fi
 echo ""
 
 if ! prompt_yesno "Deploy with this configuration?" "Y"; then
@@ -317,6 +344,19 @@ OLLAMA_EMBED_MODEL=${EMBED_MODEL}
 EOF
       ;;
   esac
+fi
+
+# Git sync config
+if [ "$GIT_PROVIDER" != "skip" ]; then
+  cat >> .env <<EOF
+
+# Git sync
+BRAIN_GIT_REMOTE=${BRAIN_GIT_REMOTE}
+BRAIN_GIT_BRANCH=${BRAIN_GIT_BRANCH}
+BRAIN_GIT_TOKEN=${BRAIN_GIT_TOKEN}
+BRAIN_GIT_USER=${BRAIN_GIT_USER}
+BRAIN_GIT_EMAIL=${BRAIN_GIT_EMAIL}
+EOF
 fi
 
 ok ".env written."

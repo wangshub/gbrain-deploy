@@ -42,8 +42,50 @@ if [ ! -f /root/.gbrain/config.json ]; then
   # shellcheck disable=SC2086
   gbrain init $INIT_ARGS
   echo "[entrypoint] gbrain initialized."
-else
-  echo "[entrypoint] gbrain already initialized, skipping init."
+
+  # Install skills (60+ skills, 9 skill packs)
+  echo "[entrypoint] Installing gbrain skills..."
+  gbrain install || echo "[entrypoint] Warning: gbrain install failed, some skills may be missing."
+  echo "[entrypoint] Skills installed."
+fi
+
+# ── Git sync ─────────────────────────────────────────
+BRAIN_DIR="/root/.gbrain"
+
+# Ensure git user is configured
+if [ -z "$(git -C "$BRAIN_DIR" config user.name 2>/dev/null)" ]; then
+  git -C "$BRAIN_DIR" config user.name "${BRAIN_GIT_USER:-gbrain}"
+  git -C "$BRAIN_DIR" config user.email "${BRAIN_GIT_EMAIL:-gbrain@localhost}"
+fi
+
+# Initialize as git repo if not already
+if [ ! -d "$BRAIN_DIR/.git" ]; then
+  echo "[entrypoint] Initializing git repo in brain directory..."
+  git init "$BRAIN_DIR"
+fi
+
+# Configure remote if specified
+if [ -n "${BRAIN_GIT_REMOTE:-}" ]; then
+  BRANCH="${BRAIN_GIT_BRANCH:-main}"
+
+  # Build authenticated URL if token provided
+  REMOTE_URL="${BRAIN_GIT_REMOTE}"
+  if [ -n "${BRAIN_GIT_TOKEN:-}" ]; then
+    # Rewrite https://github.com/user/repo -> https://token@github.com/user/repo
+    REMOTE_URL=$(echo "$REMOTE_URL" | sed "s|https://|https://${BRAIN_GIT_TOKEN}@|")
+  fi
+
+  # Set or update remote
+  if git -C "$BRAIN_DIR" remote get-url origin >/dev/null 2>&1; then
+    git -C "$BRAIN_DIR" remote set-url origin "$REMOTE_URL"
+  else
+    git -C "$BRAIN_DIR" remote add origin "$REMOTE_URL"
+  fi
+
+  # Pull latest from remote
+  echo "[entrypoint] Pulling brain from remote (${BRANCH})..."
+  git -C "$BRAIN_DIR" fetch origin "${BRANCH}" 2>/dev/null || true
+  git -C "$BRAIN_DIR" reset --hard "origin/${BRANCH}" 2>/dev/null || true
 fi
 
 echo "[entrypoint] Starting: gbrain $*"

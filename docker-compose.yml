@@ -58,14 +58,20 @@ services:
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       # Admin
       GBRAIN_ADMIN_BOOTSTRAP_TOKEN: ${GBRAIN_ADMIN_SECRET:-}
+      # Git sync
+      BRAIN_GIT_REMOTE: ${BRAIN_GIT_REMOTE:-}
+      BRAIN_GIT_BRANCH: ${BRAIN_GIT_BRANCH:-main}
+      BRAIN_GIT_TOKEN: ${BRAIN_GIT_TOKEN:-}
+      BRAIN_GIT_USER: ${BRAIN_GIT_USER:-gbrain}
+      BRAIN_GIT_EMAIL: ${BRAIN_GIT_EMAIL:-gbrain@localhost}
     volumes:
-      - brain-repo:/root/.gbrain
+      - brain-data:/root/.gbrain
     networks:
       - gbrain-net
 
 volumes:
   pgdata:
-  brain-repo:
+  brain-data:
   ollama-data:
 
 networks:
