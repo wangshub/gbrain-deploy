@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg16}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gbrain}
@@ -17,7 +17,7 @@ services:
       - gbrain-net
 
   ollama:
-    image: ollama/ollama:latest
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
     profiles:
       - ollama
     restart: unless-stopped
@@ -32,6 +32,9 @@ services:
       dockerfile: Dockerfile
       args:
         GBRAIN_REF: ${GBRAIN_REF:-master}
+        BUN_IMAGE: ${BUN_IMAGE:-oven/bun:1}
+        APT_MIRROR: ${APT_MIRROR:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -78,7 +81,7 @@ services:
       retries: 12
 
   caddy:
-    image: caddy:2
+    image: ${CADDY_IMAGE:-caddy:2}
     profiles:
       - caddy
     restart: unless-stopped

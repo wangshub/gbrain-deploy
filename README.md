@@ -268,6 +268,22 @@ docker compose up -d           # 启动全部
 </details>
 
 <details>
+<summary><b>中国大陆服务器拉不动 Docker Hub / Debian / npm 怎么办?</b></summary>
+
+在 `.env` 里取消注释「China mirror」一节,用国内镜像源拉镜像与构建依赖(默认仍走上游):
+
+```bash
+BUN_IMAGE=docker.m.daocloud.io/oven/bun:1
+POSTGRES_IMAGE=docker.m.daocloud.io/pgvector/pgvector:pg16
+CADDY_IMAGE=docker.m.daocloud.io/library/caddy:2
+APT_MIRROR=mirrors.aliyun.com
+NPM_REGISTRY=https://registry.npmmirror.com
+```
+
+然后正常 `./gbrain.sh deploy`。镜像源可达性各地不同,可换 `docker.1panel.live` 等。
+</details>
+
+<details>
 <summary><b>token 泄露 / agent 离职了怎么办?</b></summary>
 
 `./gbrain.sh agents remove <name>` 会调用上游 `gbrain auth revoke` 吊销该 token,其它 agent 不受影响。
