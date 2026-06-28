@@ -1,56 +1,30 @@
 #!/usr/bin/env bash
-# cmd/status.sh — show service status
-
+# cmd/status.sh — service status (docker-only)
 load_config
-
 header "gbrain Status"
 
-SVC_TYPE=$(detect_service_type)
-PORT="${GBRAIN_PORT:-3000}"
-HOST=$(get_external_host)
-
-# Service status
-echo -e "  ${BOLD}Mode:${NC}      ${DEPLOY_MODE}"
-
-if [ "$SVC_TYPE" = "docker" ]; then
-  if docker compose ps gbrain 2>/dev/null | grep -q "Up"; then
-    echo -e "  ${BOLD}Service:${NC}   ${GREEN}●${NC} running (Docker)"
-  else
-    echo -e "  ${BOLD}Service:${NC}   ${RED}●${NC} stopped (Docker)"
-  fi
-elif [ "$SVC_TYPE" = "systemd" ]; then
-  if systemctl is-active --quiet gbrain 2>/dev/null; then
-    UPTIME=$(systemctl show gbrain --property=ActiveEnterTimestamp 2>/dev/null | cut -d= -f2)
-    echo -e "  ${BOLD}Service:${NC}   ${GREEN}●${NC} running (systemd, since ${UPTIME})"
-  else
-    echo -e "  ${BOLD}Service:${NC}   ${RED}●${NC} stopped (systemd)"
-  fi
-elif [ "$SVC_TYPE" = "launchd" ]; then
-  if launchctl list | grep -q com.gbrain.server 2>/dev/null; then
-    echo -e "  ${BOLD}Service:${NC}   ${GREEN}●${NC} running (launchd)"
-  else
-    echo -e "  ${BOLD}Service:${NC}   ${RED}●${NC} stopped (launchd)"
-  fi
+if docker compose ps gbrain 2>/dev/null | grep -q "Up"; then
+  echo -e "  ${BOLD}Service:${NC}   ${GREEN}●${NC} running"
 else
-  echo -e "  ${BOLD}Service:${NC}   ${YELLOW}●${NC} manual mode"
+  echo -e "  ${BOLD}Service:${NC}   ${RED}●${NC} stopped"
 fi
 
-echo -e "  ${BOLD}Port:${NC}      ${PORT}"
+echo -e "  ${BOLD}Exposure:${NC}  ${EXPOSE_MODE:-private}"
+echo -e "  ${BOLD}Port:${NC}      ${GBRAIN_PORT:-3000}"
 
-# Database status
-if curl -sf "http://localhost:${PORT}/health" >/dev/null 2>&1; then
-  echo -e "  ${BOLD}Database:${NC}  ${GREEN}●${NC} healthy"
+if docker compose exec -T gbrain curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+  echo -e "  ${BOLD}Health:${NC}    ${GREEN}●${NC} healthy"
 else
-  echo -e "  ${BOLD}Database:${NC}  ${YELLOW}●${NC} unreachable (service may be down)"
+  echo -e "  ${BOLD}Health:${NC}    ${YELLOW}●${NC} unreachable"
 fi
 
-# Agent count
-CREDS_DIR="credentials"
-if [ -d "$CREDS_DIR" ]; then
-  AGENT_COUNT=$(find "$CREDS_DIR" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
-  echo -e "  ${BOLD}Agents:${NC}    ${AGENT_COUNT} registered"
+if [ "${EXPOSE_MODE:-private}" = "public" ]; then
+  echo -e "  ${BOLD}Caddy:${NC}     $(docker compose --profile caddy ps caddy 2>/dev/null | grep -q Up && echo "${GREEN}● up${NC}" || echo "${RED}● down${NC}")"
 fi
 
-# Endpoint
-echo -e "  ${BOLD}Endpoint:${NC}  http://${HOST}:${PORT}/mcp"
+if [ -d credentials ]; then
+  N=$(find credentials -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')
+  echo -e "  ${BOLD}Agents:${NC}    ${N} local credential file(s)"
+fi
+echo -e "  ${BOLD}Endpoint:${NC}  $(agent_endpoint)"
 echo ""

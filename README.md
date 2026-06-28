@@ -18,25 +18,26 @@
 
 ---
 
-## 两种部署方式怎么选？
+## 网络暴露模式
 
-部署时会自动询问你选择哪种模式：
+部署时会询问你选择哪种网络暴露方式（写入 `.env` 的 `EXPOSE_MODE`）：
 
-| | Local 模式 | Docker 模式 |
+| | `public` 模式 | `private` 模式 |
 |---|---|---|
-| **需要 Docker 吗** | 不需要 | 需要 |
-| **适合什么服务器** | 国内服务器（不用拉 Docker 镜像） | 海外服务器、云主机 |
-| **数据库** | 本机 PostgreSQL | Docker 容器内 PostgreSQL |
-| **怎么管理服务** | systemd / launchd | docker compose |
-| **要求** | 有 root 或 sudo 权限 | 装好 Docker + Compose |
+| **适合场景** | 有公网域名的云服务器 | Tailscale / 内网 / 本地开发 |
+| **HTTPS** | 自动（Let's Encrypt + Caddy） | 走内网/VPN 加密，或 `tailscale serve` |
+| **需要什么** | 域名 + ACME 邮箱 | 无额外要求 |
+| **MCP 端点** | `https://<domain>/mcp` | `http://<bind-addr>:<port>/mcp` |
+| **管理后台** | `https://<domain>/admin` | `http://<bind-addr>:<port>/admin` |
 
-选哪个都行，功能完全一样。
+- **public**：启用 Caddy compose profile + Let's Encrypt 自动 HTTPS，填入域名（`DOMAIN`）和邮箱（`ACME_EMAIL`）即可。
+- **private**：不启 Caddy，gbrain 绑定到 `GBRAIN_BIND_ADDR`（默认 `127.0.0.1`，Tailscale 场景填 `100.x.x.x`），通过内网/WireGuard 走纯 HTTP。需要 HTTPS+MagicDNS 时可自行运行 `tailscale serve --bg https / http://localhost:<port>`。
 
 ---
 
 ## 部署时会被问到什么？
 
-两种方式问的问题基本相同：
+部署向导会依次问以下问题：
 
 ### 1. 数据库
 
@@ -81,14 +82,35 @@ API Key: sk-xxx
 ollama pull nomic-embed-text
 ```
 
-### 4. 服务端口和管理密码
+### 4. 网络暴露模式
+
+```text
+暴露模式：
+  1) public  — 公网域名 + Caddy 自动 HTTPS
+  2) private — 内网/Tailscale（纯 HTTP，绑定指定地址）
+```
+
+选 `public` 还需填：
+
+```text
+域名（如 gbrain.example.com）:
+ACME 邮箱:
+```
+
+选 `private` 还需填（回车使用默认）：
+
+```text
+绑定地址 [127.0.0.1]: ← Tailscale 场景填 100.x.x.x
+```
+
+### 5. 服务端口和管理密码
 
 ```text
 HTTP 端口 [3000]:
 管理密码 [自动生成]: ← 回车自动生成
 ```
 
-### 5. 确认部署
+### 6. 确认部署
 
 脚本会显示一个配置汇总，确认后自动开始安装。
 
@@ -103,15 +125,20 @@ HTTP 端口 [3000]:
   gbrain 已启动！
 ╚══════════════════════════════════════════╝
 
-  MCP 地址:    http://192.168.1.100:3000/mcp
-  管理后台:    http://192.168.1.100:3000/admin
+  # public 模式：
+  MCP 地址:    https://your.domain/mcp
+  管理后台:    https://your.domain/admin
+
+  # private 模式：
+  MCP 地址:    http://100.x.x.x:3000/mcp
+  管理后台:    http://100.x.x.x:3000/admin
 ```
 
 ### 接入 Agent
 
 ```bash
-# 注册一个 agent，拿到连接凭证
-./gbrain.sh agents add claude-code "read write"
+# 注册一个 agent，拿到连接凭证（gbrain_... token，只显示一次）
+./gbrain.sh agents add claude-code
 
 # 查看已注册的 agents
 ./gbrain.sh agents list
@@ -172,26 +199,7 @@ Claude Code: [调用 gbrain graph-query]
 ./gbrain.sh restart  # 重启生效
 ```
 
-### 手动管理服务（高级用户）
-
-**本机部署（systemd）：**
-
-```bash
-sudo systemctl status gbrain
-sudo systemctl restart gbrain
-sudo journalctl -u gbrain -f
-```
-
-**本机部署（macOS launchd）：**
-
-```bash
-launchctl list | grep gbrain
-launchctl unload ~/Library/LaunchAgents/com.gbrain.server.plist
-launchctl load ~/Library/LaunchAgents/com.gbrain.server.plist
-tail -f ~/Library/Logs/gbrain.log
-```
-
-**Docker 部署：**
+### 手动管理 Docker（高级用户）
 
 ```bash
 docker compose ps
@@ -206,11 +214,12 @@ docker compose up -d
 ## 备份和迁移
 
 ```bash
-# 备份（Docker 和 Local 模式都支持）
+# 备份（生成 AES-256 加密的 .tar.enc 文件，口令来自 .env 的 BACKUP_PASSPHRASE）
 ./gbrain.sh backup
+# 默认保留最近 7 份（BACKUP_KEEP），自动轮转
 
-# 恢复
-./gbrain.sh restore backups/latest
+# 恢复（需要相同的 BACKUP_PASSPHRASE）
+./gbrain.sh restore backups/gbrain-<timestamp>.tar.enc
 
 # 迁移到新服务器：备份 → 复制到新机器 → 恢复 → 重新部署
 ```
@@ -248,9 +257,6 @@ gbrain-deploy/
 
 ## 常见问题
 
-**Q: 国内服务器拉不到 Docker 镜像怎么办？**
-选 Local 模式，不需要 Docker。
-
 **Q: 不想用 OpenAI，有国内替代吗？**
 选「自定义地址」，填你的中转站或私有 API 地址即可。任何 OpenAI 兼容的 API 都行。
 
@@ -266,7 +272,7 @@ gbrain-deploy/
 ```
 
 **Q: 支持 macOS 吗？**
-支持。Local 模式会自动创建 launchd 服务。Docker 模式也支持。
+支持 Docker Desktop for Mac，按正常 Docker 部署流程操作即可。
 
 ---
 

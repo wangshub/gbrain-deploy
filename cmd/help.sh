@@ -8,10 +8,8 @@ show_help() {
     case "$topic" in
       deploy)
         echo -e "${BOLD}gbrain.sh deploy${NC}"
-        echo "  Run interactive deployment wizard."
-        echo "  Choose Docker or local, configure DB, LLM, embedding, git sync."
-        echo ""
-        echo -e "  ${DIM}Equivalent to: ./deploy-docker.sh or ./deploy-local.sh${NC}"
+        echo "  Interactive Docker deployment wizard (public domain or private/Tailscale)."
+        echo "  Configure DB, LLM, embedding, network exposure, git sync."
         ;;
       status)
         echo -e "${BOLD}gbrain.sh status${NC}"
@@ -31,17 +29,17 @@ show_help() {
         echo ""
         echo -e "  ${DIM}Subcommands:${NC}"
         echo "    list                List all registered agents"
-        echo "    add <name> [scope]  Register a new agent"
+        echo "    add <name>          Register a new agent"
         echo "    remove <name>       Remove an agent's credentials"
         ;;
       backup)
         echo -e "${BOLD}gbrain.sh backup [directory]${NC}"
-        echo "  Backup PostgreSQL database + brain data + config."
+        echo "  Backup PostgreSQL database + brain data + config (AES-256 encrypted, 7-day rotation)."
         echo "  Default directory: backups/"
         ;;
       restore)
-        echo -e "${BOLD}gbrain.sh restore <backup-directory>${NC}"
-        echo "  Restore from a previous backup."
+        echo -e "${BOLD}gbrain.sh restore <backups/gbrain-*.tar.enc>${NC}"
+        echo "  Restore from an encrypted backup file (requires matching BACKUP_PASSPHRASE from .env)."
         ;;
       config)
         echo -e "${BOLD}gbrain.sh config [get|set] [key] [value]${NC}"
@@ -53,8 +51,7 @@ show_help() {
         ;;
       start|stop|restart)
         echo -e "${BOLD}gbrain.sh ${topic}${NC}"
-        echo "  ${topic^} the gbrain service."
-        echo "  Auto-detects Docker / systemd / launchd."
+        echo "  ${topic^} the gbrain Docker service."
         ;;
       test)
         echo -e "${BOLD}gbrain.sh test${NC}"
@@ -76,7 +73,7 @@ show_help() {
   echo -e "  ${BOLD}Usage:${NC} gbrain.sh <command> [options]"
   echo ""
   echo -e "  ${BOLD}Deploy & Manage:${NC}"
-  echo -e "    ${CYAN}deploy${NC}     Interactive deployment wizard (Docker or local)"
+  echo -e "    ${CYAN}deploy${NC}     Interactive Docker deployment wizard (public domain or private/Tailscale)"
   echo -e "    ${CYAN}status${NC}     Show service health and info"
   echo -e "    ${CYAN}logs${NC}       Tail service logs (-f, -n N)"
   echo -e "    ${CYAN}start${NC}      Start the gbrain service"

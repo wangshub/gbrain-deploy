@@ -11,3 +11,6 @@ backups/
 
 # OS
 .DS_Store
+
+# Subagent-driven scratch
+.superpowers/

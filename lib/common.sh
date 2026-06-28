@@ -65,60 +65,31 @@ prompt_yesno() {
 # ── Utilities ────────────────────────────────────────
 gen_secret() { openssl rand -base64 24 | tr -d '/+=' | head -c 32; }
 
-get_external_host() {
-  hostname -I 2>/dev/null | awk '{print $1}' || hostname 2>/dev/null || echo "YOUR_SERVER_IP"
-}
-
-# ── Config loading ───────────────────────────────────
-# Auto-detect deploy mode and load config.
-# Sets: DEPLOY_MODE (docker|local), GBRAIN_PORT, GBRAIN_ADMIN_SECRET, etc.
+# ── Config loading (docker-only) ─────────────────────
 load_config() {
-  local local_env="$HOME/.gbrain-deploy/.env.local"
-  if [ -f .env ]; then
-    set -a; source .env; set +a
-    DEPLOY_MODE="docker"
-  elif [ -f "$local_env" ]; then
-    set -a; source "$local_env"; set +a
-    DEPLOY_MODE="local"
-  else
-    die "No config found. Run './gbrain.sh deploy' or './deploy-docker.sh' first."
-  fi
+  [ -f .env ] || die "No .env found. Run './gbrain.sh deploy' first."
+  set -a; source .env; set +a
+  DEPLOY_MODE="docker"
 }
 
-# ── Health check ─────────────────────────────────────
+# ── Health check (via container) ─────────────────────
 wait_for_health() {
-  local port="${1:-${GBRAIN_PORT:-3000}}"
-  local max_wait="${2:-30}"
-  local elapsed=0
-  while [ $elapsed -lt $max_wait ]; do
-    if curl -sf "http://localhost:${port}/health" >/dev/null 2>&1; then
+  local max_wait="${1:-60}" elapsed=0
+  while [ "$elapsed" -lt "$max_wait" ]; do
+    if docker compose exec -T gbrain curl -sf http://localhost:3000/health >/dev/null 2>&1; then
       return 0
     fi
-    sleep 1
-    elapsed=$((elapsed + 1))
+    sleep 2
+    elapsed=$((elapsed + 2))
   done
   return 1
 }
 
-# ── Deploy mode detection ────────────────────────────
-# Returns 0 if docker mode, 1 if local mode
-is_docker_mode() {
-  [ -f .env ]
-}
-
-is_local_mode() {
-  [ ! -f .env ]
-}
-
-# ── Service helpers ──────────────────────────────────
-detect_service_type() {
-  if is_docker_mode; then
-    echo "docker"
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "launchd"
-  elif systemctl list-unit-files gbrain.service >/dev/null 2>&1; then
-    echo "systemd"
+# ── Endpoint + compose helpers ───────────────────────
+agent_endpoint() {
+  if [ "${EXPOSE_MODE:-private}" = "public" ]; then
+    echo "https://${DOMAIN}/mcp"
   else
-    echo "manual"
+    echo "http://${GBRAIN_BIND_ADDR:-127.0.0.1}:${GBRAIN_PORT:-3000}/mcp"
   fi
 }

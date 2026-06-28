@@ -9,30 +9,35 @@
 每个 Agent 需要独立的凭证。在部署 gbrain 的服务器上运行：
 
 ```bash
-./register-agent.sh <agent名称> "<权限>"
+./gbrain.sh agents add <agent名称>
 ```
 
-**权限说明：**
-
-| 权限 | 能做什么 | 适合谁 |
-|------|---------|--------|
-| `read` | 搜索、查询、读取页面 | 只读观察者、监控系统 |
-| `read write` | 读写页面、捕获知识、自动建链 | Agent（默认选这个） |
-| `read write admin` | 全部权限，包括注册新客户端 | 管理员 |
+底层调用上游 `gbrain auth create`，签发一次性 `gbrain_<hex>` token，存入 `credentials/<名称>.json`。
 
 **示例：**
 
 ```bash
-./register-agent.sh claude-code "read write"
-./register-agent.sh openclaw "read write"
-./register-agent.sh monitor "read"
+./gbrain.sh agents add claude-code
+./gbrain.sh agents add openclaw
+./gbrain.sh agents add monitor
 ```
 
-注册完会输出 `client_secret`，保存好，只显示一次。
+注册完会输出 token（`gbrain_...`），保存好，只显示一次。在 Agent 配置里以 Bearer 方式使用：
+
+```
+Authorization: Bearer gbrain_...
+```
 
 ---
 
 ## 第二步：选择接入方式
+
+**MCP 端点地址**取决于部署时选择的网络暴露模式：
+
+| 模式 | MCP 端点 |
+|------|---------|
+| `public`（公网域名） | `https://your.domain/mcp` |
+| `private`（Tailscale/内网） | `http://<bind-addr>:<port>/mcp` |
 
 根据你用的 Agent 类型，选一种：
 
@@ -47,9 +52,9 @@
   "mcpServers": {
     "gbrain": {
       "type": "http",
-      "url": "http://YOUR_SERVER:3000/mcp",
+      "url": "https://your.domain/mcp",
       "headers": {
-        "Authorization": "Bearer <你的client_secret>"
+        "Authorization": "Bearer gbrain_..."
       }
     }
   }
@@ -76,9 +81,11 @@
 # 1. 安装 gbrain CLI
 bun install -g github:garrytan/gbrain
 
-# 2. 指向共享服务器
-export GBRAIN_MCP_URL=http://YOUR_SERVER:3000/mcp
-export GBRAIN_MCP_TOKEN=<你的client_secret>
+# 2. 指向共享服务器（URL 按暴露模式填写）
+export GBRAIN_MCP_URL=https://your.domain/mcp   # public 模式
+# 或
+# export GBRAIN_MCP_URL=http://100.x.x.x:3000/mcp  # private 模式
+export GBRAIN_MCP_TOKEN=gbrain_...
 
 # 3. 安装 skillpack（43+ 技能，Agent 自动识别）
 gbrain skillpack scaffold --all
@@ -96,8 +103,8 @@ gbrain doctor
 ```bash
 bun install -g github:garrytan/gbrain
 
-export GBRAIN_MCP_URL=http://YOUR_SERVER:3000/mcp
-export GBRAIN_MCP_TOKEN=<你的client_secret>
+export GBRAIN_MCP_URL=https://your.domain/mcp   # public 模式（或 http://...:<port>/mcp）
+export GBRAIN_MCP_TOKEN=gbrain_...
 
 # 搜索
 gbrain search "谁在 Acme AI 工作"
@@ -114,12 +121,18 @@ gbrain graph-query people/bob --depth 2
 适用于：**Zapier、IFTTT、Apple Shortcuts、自定义脚本** 等非 MCP 环境。
 
 ```bash
-curl -X POST http://YOUR_SERVER:3000/ingest \
-  -H "Authorization: Bearer <你的client_secret>" \
+curl -X POST https://your.domain/ingest \          # public 模式
+  -H "Authorization: Bearer gbrain_..." \
   -H "Content-Type: text/markdown" \
   -d "# 标题
 
 内容写在这里..."
+
+# private 模式
+# curl -X POST http://<GBRAIN_BIND_ADDR>:<GBRAIN_PORT>/ingest \
+#   -H "Authorization: Bearer gbrain_..." \
+#   -H "Content-Type: text/markdown" \
+#   -d "内容..."
 ```
 
 ---
@@ -127,8 +140,10 @@ curl -X POST http://YOUR_SERVER:3000/ingest \
 ## 第三步：验证连接
 
 ```bash
-# 测试服务是否在线
-curl http://YOUR_SERVER:3000/health
+# 测试服务是否在线（URL 按暴露模式填写）
+curl https://your.domain/health          # public 模式
+# 或
+curl http://100.x.x.x:3000/health       # private 模式
 
 # 在 Agent 中试试搜索
 # （如果接入了 Claude Code，直接对话即可）
@@ -157,8 +172,8 @@ curl http://YOUR_SERVER:3000/health
 
 ```bash
 # 1. 在服务器上注册
-./register-agent.sh my-claude "read write"
-# 输出: client_secret = abc123...
+./gbrain.sh agents add my-claude
+# 输出: token = gbrain_abc123...
 
 # 2. 在本机配置（写入项目的 .claude/settings.json）
 cat > .claude/settings.json <<EOF
@@ -166,9 +181,9 @@ cat > .claude/settings.json <<EOF
   "mcpServers": {
     "gbrain": {
       "type": "http",
-      "url": "http://192.168.1.100:3000/mcp",
+      "url": "https://your.domain/mcp",
       "headers": {
-        "Authorization": "Bearer abc123..."
+        "Authorization": "Bearer gbrain_abc123..."
       }
     }
   }

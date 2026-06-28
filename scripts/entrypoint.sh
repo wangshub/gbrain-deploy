@@ -73,21 +73,22 @@ fi
 if [ -n "${BRAIN_GIT_REMOTE:-}" ]; then
   BRANCH="${BRAIN_GIT_BRANCH:-main}"
 
-  # Build authenticated URL if token provided
-  REMOTE_URL="${BRAIN_GIT_REMOTE}"
+  # Store token via git credential-store (chmod 600), never embed in remote URL
   if [ -n "${BRAIN_GIT_TOKEN:-}" ]; then
-    # Rewrite https://github.com/user/repo -> https://token@github.com/user/repo
-    REMOTE_URL=$(echo "$REMOTE_URL" | sed "s|https://|https://${BRAIN_GIT_TOKEN}@|")
+    GIT_HOST=$(echo "$BRAIN_GIT_REMOTE" | sed -n 's|https://\([^/]*\)/.*|\1|p')
+    if [ -n "$GIT_HOST" ]; then
+      git -C "$BRAIN_DIR" config credential.helper store
+      printf 'https://%s:x-oauth-basic@%s\n' "${BRAIN_GIT_TOKEN}" "${GIT_HOST}" > /root/.git-credentials
+      chmod 600 /root/.git-credentials
+    fi
   fi
 
-  # Set or update remote
   if git -C "$BRAIN_DIR" remote get-url origin >/dev/null 2>&1; then
-    git -C "$BRAIN_DIR" remote set-url origin "$REMOTE_URL"
+    git -C "$BRAIN_DIR" remote set-url origin "$BRAIN_GIT_REMOTE"
   else
-    git -C "$BRAIN_DIR" remote add origin "$REMOTE_URL"
+    git -C "$BRAIN_DIR" remote add origin "$BRAIN_GIT_REMOTE"
   fi
 
-  # Pull latest from remote
   echo "[entrypoint] Pulling brain from remote (${BRANCH})..."
   git -C "$BRAIN_DIR" fetch origin "${BRANCH}" 2>/dev/null || true
   git -C "$BRAIN_DIR" reset --hard "origin/${BRANCH}" 2>/dev/null || true
