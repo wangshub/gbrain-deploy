@@ -3,12 +3,11 @@ FROM oven/bun:1
 ARG GBRAIN_REF=master
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates postgresql-client \
+    git ca-certificates postgresql-client curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 --branch "${GBRAIN_REF}" https://github.com/garrytan/gbrain.git /opt/gbrain-src \
     && cd /opt/gbrain-src && bun install \
-    && bun run build 2>/dev/null; true \
     && bun install -g file:/opt/gbrain-src \
     && mkdir -p /root/admin && cp -r /opt/gbrain-src/admin/dist /root/admin/
 
