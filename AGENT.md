@@ -121,12 +121,18 @@ gbrain graph-query people/bob --depth 2
 适用于：**Zapier、IFTTT、Apple Shortcuts、自定义脚本** 等非 MCP 环境。
 
 ```bash
-curl -X POST https://your.domain/ingest \
+curl -X POST https://your.domain/ingest \          # public 模式
   -H "Authorization: Bearer gbrain_..." \
   -H "Content-Type: text/markdown" \
   -d "# 标题
 
 内容写在这里..."
+
+# private 模式
+# curl -X POST http://<GBRAIN_BIND_ADDR>:<GBRAIN_PORT>/ingest \
+#   -H "Authorization: Bearer gbrain_..." \
+#   -H "Content-Type: text/markdown" \
+#   -d "内容..."
 ```
 
 ---

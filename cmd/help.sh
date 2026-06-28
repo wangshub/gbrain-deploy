@@ -34,12 +34,12 @@ show_help() {
         ;;
       backup)
         echo -e "${BOLD}gbrain.sh backup [directory]${NC}"
-        echo "  Backup PostgreSQL database + brain data + config."
+        echo "  Backup PostgreSQL database + brain data + config (AES-256 encrypted, 7-day rotation)."
         echo "  Default directory: backups/"
         ;;
       restore)
-        echo -e "${BOLD}gbrain.sh restore <backup-directory>${NC}"
-        echo "  Restore from a previous backup."
+        echo -e "${BOLD}gbrain.sh restore <backups/gbrain-*.tar.enc>${NC}"
+        echo "  Restore from an encrypted backup file (requires matching BACKUP_PASSPHRASE from .env)."
         ;;
       config)
         echo -e "${BOLD}gbrain.sh config [get|set] [key] [value]${NC}"
