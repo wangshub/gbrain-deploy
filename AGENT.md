@@ -1,223 +1,157 @@
-# Agent 接入指南
+<div align="center">
 
-> 让任何 AI Agent 连接到你的共享 gbrain 知识大脑。
+# 🔌 Agent 接入指南
+
+**把任意 AI Agent 连到你的共享 gbrain 知识大脑**
+
+[← 回到 README](README.md) · [🔑 注册凭证](#-第一步注册凭证) · [🔗 接入方式](#-第二步接入) · [🧰 能做什么](#-连上之后能做什么)
+
+</div>
 
 ---
 
-## 第一步：注册凭证
+## 🔑 第一步:注册凭证
 
-每个 Agent 需要独立的凭证。在部署 gbrain 的服务器上运行：
-
-```bash
-./gbrain.sh agents add <agent名称>
-```
-
-底层调用上游 `gbrain auth create`，签发一次性 `gbrain_<hex>` token，存入 `credentials/<名称>.json`。
-
-**示例：**
+每个 agent 用一份**独立、可单独吊销**的凭证。在部署 gbrain 的服务器上运行:
 
 ```bash
 ./gbrain.sh agents add claude-code
-./gbrain.sh agents add openclaw
-./gbrain.sh agents add monitor
 ```
 
-注册完会输出 token（`gbrain_...`），保存好，只显示一次。在 Agent 配置里以 Bearer 方式使用：
+底层调用上游 `gbrain auth create`,签发一次性 `gbrain_<hex>` token(**只显示一次**,保存在 `credentials/claude-code.json`)。
 
+```bash
+./gbrain.sh agents list            # 查看已注册的 agents
+./gbrain.sh agents remove <name>   # 吊销(调上游 gbrain auth revoke)
 ```
-Authorization: Bearer gbrain_...
-```
+
+> 凭证以 Bearer 方式使用:`Authorization: Bearer gbrain_...`
+
+**MCP 端点地址**取决于部署时选的[网络暴露模式](README.md#-网络暴露模式):
+
+| 模式 | MCP 端点 |
+|---|---|
+| 🌍 `public`（公网域名） | `https://<域名>/mcp` |
+| 🔒 `private`（Tailscale/内网） | `http://<bind-addr>:<port>/mcp` |
 
 ---
 
-## 第二步：选择接入方式
+## 🔗 第二步:接入
 
-**MCP 端点地址**取决于部署时选择的网络暴露模式：
+### 方式 1 — `gbrain connect`（推荐:一条命令自动配置）
 
-| 模式 | MCP 端点 |
-|------|---------|
-| `public`（公网域名） | `https://your.domain/mcp` |
-| `private`（Tailscale/内网） | `http://<bind-addr>:<port>/mcp` |
+适用:**Claude Code、Codex、Perplexity**,以及任何 `generic` MCP 客户端。在 agent 所在的机器上:
 
-根据你用的 Agent 类型，选一种：
+```bash
+# 装好 gbrain CLI
+bun install -g github:garrytan/gbrain
 
-### 方式 A：MCP HTTP（推荐）
+# 一条命令接入(URL 是位置参数,按暴露模式填写)
+gbrain connect https://<域名>/mcp \
+  --token gbrain_... \
+  --agent claude-code \    # 可选:claude-code | codex | perplexity | generic
+  --install \              # 顺便安装大脑提供的 skillpack
+  --yes
+```
 
-适用于：**Claude Code、Cursor、Windsurf、ChatGPT、Perplexity** 等支持 MCP 的客户端。
+它会自动把 MCP 配置写进对应客户端。私网模式把 URL 换成 `http://<bind-addr>:<port>/mcp`。
 
-在 Agent 的配置文件里加上：
+> token 也可改用环境变量 **`GBRAIN_REMOTE_TOKEN`** 提供(URL 仍作为位置参数传入)。
+
+### 方式 2 — 手动 MCP HTTP 配置
+
+适用:**Cursor、Windsurf**,或任何 `gbrain connect` 未直接支持、但支持 MCP 的客户端。在客户端的 MCP 配置里加一段(Claude Code 用 `claude mcp add` 或项目根的 `.mcp.json`;Cursor 在 设置 → MCP):
 
 ```json
 {
   "mcpServers": {
     "gbrain": {
       "type": "http",
-      "url": "https://your.domain/mcp",
-      "headers": {
-        "Authorization": "Bearer gbrain_..."
-      }
+      "url": "https://<域名>/mcp",
+      "headers": { "Authorization": "Bearer gbrain_..." }
     }
   }
 }
 ```
 
-**各客户端的配置文件位置：**
+> 私网模式把 `url` 换成 `http://<bind-addr>:<port>/mcp`。
 
-| Agent | 配置文件 |
-|-------|---------|
-| Claude Code（当前项目） | 项目目录 `.claude/settings.json` |
-| Claude Code（全局） | `~/.claude/settings.json` |
-| Cursor | 设置 → MCP → Add Server |
-| Windsurf | 设置 → MCP Servers |
-| 其他 MCP 客户端 | 查看其文档中的 MCP 配置方式 |
+### 方式 3 — Webhook（非 MCP 环境）
 
-### 方式 B：Skillpack（OpenClaw / Hermes）
-
-适用于：**OpenClaw、Hermes** 等 gbrain 原生支持的 Agent 平台。
-
-在 Agent 所在的机器上：
+适用:**Zapier、Apple Shortcuts、自定义脚本** 等。直接把 markdown POST 到 `/ingest`:
 
 ```bash
-# 1. 安装 gbrain CLI
-bun install -g github:garrytan/gbrain
-
-# 2. 指向共享服务器（URL 按暴露模式填写）
-export GBRAIN_MCP_URL=https://your.domain/mcp   # public 模式
-# 或
-# export GBRAIN_MCP_URL=http://100.x.x.x:3000/mcp  # private 模式
-export GBRAIN_MCP_TOKEN=gbrain_...
-
-# 3. 安装 skillpack（43+ 技能，Agent 自动识别）
-gbrain skillpack scaffold --all
-
-# 4. 验证连接
-gbrain doctor
-```
-
-把环境变量写到 Agent 的启动配置里，确保重启后仍然生效。
-
-### 方式 C：CLI 瘦客户端
-
-适用于：**任何能运行命令行的环境**，比如脚本、CI/CD、定时任务。
-
-```bash
-bun install -g github:garrytan/gbrain
-
-export GBRAIN_MCP_URL=https://your.domain/mcp   # public 模式（或 http://...:<port>/mcp）
-export GBRAIN_MCP_TOKEN=gbrain_...
-
-# 搜索
-gbrain search "谁在 Acme AI 工作"
-
-# 写入
-gbrain capture "今天和 Bob 讨论了新项目的架构方案"
-
-# 查询知识图谱
-gbrain graph-query people/bob --depth 2
-```
-
-### 方式 D：Webhook
-
-适用于：**Zapier、IFTTT、Apple Shortcuts、自定义脚本** 等非 MCP 环境。
-
-```bash
-curl -X POST https://your.domain/ingest \          # public 模式
+curl -X POST https://<域名>/ingest \
   -H "Authorization: Bearer gbrain_..." \
   -H "Content-Type: text/markdown" \
   -d "# 标题
 
 内容写在这里..."
-
-# private 模式
-# curl -X POST http://<GBRAIN_BIND_ADDR>:<GBRAIN_PORT>/ingest \
-#   -H "Authorization: Bearer gbrain_..." \
-#   -H "Content-Type: text/markdown" \
-#   -d "内容..."
 ```
+
+> 私网模式把地址换成 `http://<bind-addr>:<port>/ingest`。
 
 ---
 
-## 第三步：验证连接
+## ✅ 验证连接
 
 ```bash
-# 测试服务是否在线（URL 按暴露模式填写）
-curl https://your.domain/health          # public 模式
-# 或
-curl http://100.x.x.x:3000/health       # private 模式
-
-# 在 Agent 中试试搜索
-# （如果接入了 Claude Code，直接对话即可）
+curl https://<域名>/health              # public 模式
+curl http://<bind-addr>:<port>/health   # private 模式
+# 返回内容包含 "ok" 即表示服务在线
 ```
 
----
-
-## 连上之后能做什么？
-
-| 操作 | 说明 |
-|------|------|
-| `search` | 混合搜索（向量 + 关键词 + 知识图谱） |
-| `capture` | 快速捕获一条想法或笔记 |
-| `put_page` / `get_page` | 读写知识页面 |
-| `graph_query` | 知识图谱查询（如：Bob 投资了哪些公司？） |
-| `think` | 基于时间线的事实问答 |
-| `find_trajectory` | 查询某实体随时间的变化轨迹 |
-
-这些操作通过 MCP 协议自动暴露给 Agent——接上就能用，不需要额外配置。
+接了 Claude Code 的话,直接对话让它搜一下知识库,就能验证工具是否生效。
 
 ---
 
-## 接入示例
+## 🧰 连上之后能做什么
 
-以下是一个完整的「注册 → 配置 → 使用」流程，以 Claude Code 为例：
+Agent 通过 MCP 协议自动获得这些工具,**接上即用、无需额外配置**:
+
+| 工具 | 说明 |
+|---|---|
+| `search` / `query` | 混合检索(向量 + 关键词 + RRF);`query` 支持文本/图片路由 |
+| `put_page` / `get_page` | 读写知识页面(markdown + frontmatter) |
+| `list_pages` | 按条件列出/筛选页面 |
+| `think` | 跨页面 + 观点 + 图谱的多跳综合问答 |
+| `traverse_graph` / `get_links` / `get_backlinks` | 知识图谱遍历、正向/反向链接 |
+| `add_tag` / `get_tags` / `add_link` | 标签与页面链接管理 |
+| `takes_search` / `takes_list` | 检索"观点/预测"类条目(takes) |
+
+> 这是常用子集。完整且随版本演进的工具列表以上游 [gbrain](https://github.com/garrytan/gbrain) 为准。
+
+---
+
+## 💬 接入示例（Claude Code）
 
 ```bash
-# 1. 在服务器上注册
-./gbrain.sh agents add my-claude
-# 输出: token = gbrain_abc123...
+# 1. 服务器上注册,拿到 token
+./gbrain.sh agents add my-claude        # 输出 token = gbrain_abc123...
 
-# 2. 在本机配置（写入项目的 .claude/settings.json）
-cat > .claude/settings.json <<EOF
-{
-  "mcpServers": {
-    "gbrain": {
-      "type": "http",
-      "url": "https://your.domain/mcp",
-      "headers": {
-        "Authorization": "Bearer gbrain_abc123..."
-      }
-    }
-  }
-}
-EOF
+# 2. 本机一条命令接入
+gbrain connect https://<域名>/mcp --token gbrain_abc123... --agent claude-code --yes
 
-# 3. 直接和 Claude Code 对话
-# Claude Code 会自动调用 gbrain 的 MCP 工具
+# 3. 直接对话,Claude Code 会自动调用 gbrain 的 MCP 工具
 ```
 
-**对话示例：**
+**对话示例:**
 
-```
-你: 帮我查一下之前和 Bob 讨论过的项目方案
+```text
+你: 帮我查之前和 Bob 讨论过的项目方案
+Claude Code: [search "Bob 项目方案"]
+  1. "和 Bob 讨论 Acme 项目架构" — 选了微服务方案…
+  2. "Acme 项目技术选型" — 数据库用 PostgreSQL…
 
-Claude Code: [自动调用 gbrain search "Bob 项目方案"]
-  找到 3 条相关记录：
-  1. "2024-03-15 和 Bob 讨论 Acme 项目架构" — 选择了微服务方案...
-  2. "2024-03-20 Acme 项目技术选型" — 数据库用 PostgreSQL...
-  ...
-```
+你: 记一下:明天 15:00 和 Alice 开会,讨论 Q2 预算
+Claude Code: [put_page] 已保存到知识库。
 
-```
-你: 记一下：明天下午 3 点和 Alice 开会，讨论 Q2 预算
-
-Claude Code: [自动调用 gbrain capture]
-  已保存到知识库。
+你: Bob 投资了哪些公司?
+Claude Code: [traverse_graph people/bob]
+  - Acme AI(种子轮,2024-01)
+  - Beta Corp(A 轮,2024-03)
 ```
 
-```
-你: Bob 投资了哪些公司？
+---
 
-Claude Code: [自动调用 gbrain graph-query people/bob]
-  根据知识图谱，Bob 投资了：
-  - Acme AI（种子轮，2024年1月）
-  - Beta Corp（A轮，2024年3月）
-```
+<div align="center"><sub>注册 → 一条命令接入 → 直接对话。部署细节见 <a href="README.md">README</a> 🧠</sub></div>
