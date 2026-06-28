@@ -30,12 +30,15 @@ docker compose exec -T postgres psql -U postgres -d "${POSTGRES_DB:-gbrain}" \
 docker compose exec -T postgres psql -U "${POSTGRES_USER:-gbrain}" -d "${POSTGRES_DB:-gbrain}" < "${WORK}/gbrain.sql"
 
 echo "[4/4] Restoring brain data..."
+docker compose start gbrain
 if [ -f "${WORK}/brain-data.tar.gz" ]; then
-  docker compose start gbrain
-  docker compose exec -T gbrain sh -c 'rm -rf /root/.gbrain && tar xzf - -C /root' < "${WORK}/brain-data.tar.gz" || true
-  docker compose restart gbrain
-else
-  docker compose start gbrain
+  # /root/.gbrain is a volume mountpoint — clear its CONTENTS (not the dir itself),
+  # then extract. Surface failure instead of silently swallowing it.
+  if docker compose exec -T gbrain sh -c 'find /root/.gbrain -mindepth 1 -delete 2>/dev/null; tar xzf - -C /root' < "${WORK}/brain-data.tar.gz"; then
+    docker compose restart gbrain
+  else
+    warn "Brain data restore failed — database was restored, but brain content may be incomplete."
+  fi
 fi
 
 echo ""

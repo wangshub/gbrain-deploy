@@ -19,7 +19,7 @@ else
 fi
 
 if [ "${EXPOSE_MODE:-private}" = "public" ]; then
-  echo -e "  ${BOLD}Caddy:${NC}     $(docker compose ps caddy 2>/dev/null | grep -q Up && echo "${GREEN}● up${NC}" || echo "${RED}● down${NC}")"
+  echo -e "  ${BOLD}Caddy:${NC}     $(docker compose --profile caddy ps caddy 2>/dev/null | grep -q Up && echo "${GREEN}● up${NC}" || echo "${RED}● down${NC}")"
 fi
 
 if [ -d credentials ]; then

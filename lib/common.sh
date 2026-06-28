@@ -65,10 +65,6 @@ prompt_yesno() {
 # ── Utilities ────────────────────────────────────────
 gen_secret() { openssl rand -base64 24 | tr -d '/+=' | head -c 32; }
 
-get_external_host() {
-  hostname -I 2>/dev/null | awk '{print $1}' || hostname 2>/dev/null || echo "YOUR_SERVER_IP"
-}
-
 # ── Config loading (docker-only) ─────────────────────
 load_config() {
   [ -f .env ] || die "No .env found. Run './gbrain.sh deploy' first."
@@ -96,8 +92,4 @@ agent_endpoint() {
   else
     echo "http://${GBRAIN_BIND_ADDR:-127.0.0.1}:${GBRAIN_PORT:-3000}/mcp"
   fi
-}
-
-compose_profile_args() {
-  [ "${EXPOSE_MODE:-private}" = "public" ] && echo "--profile caddy"
 }

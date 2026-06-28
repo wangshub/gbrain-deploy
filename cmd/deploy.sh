@@ -239,6 +239,12 @@ deploy_docker() {
       DOMAIN=$(prompt_text "Domain (must resolve to this server)" "brain.example.com")
       ACME_EMAIL=$(prompt_text "Email for Let's Encrypt" "you@example.com")
       ;;
+    *)
+      EXPOSE_MODE="private"
+      GBRAIN_BIND_ADDR="127.0.0.1"
+      DOMAIN=""
+      ACME_EMAIL=""
+      ;;
   esac
 
   # Summary
