@@ -1,60 +1,41 @@
 #!/usr/bin/env bash
-# cmd/backup.sh — backup database + brain data + config
-
+# cmd/backup.sh — encrypted, rotated backup (docker-only)
 load_config
 
+[ -n "${BACKUP_PASSPHRASE:-}" ] || die "BACKUP_PASSPHRASE not set in .env."
+
 BACKUP_DIR="${1:-backups}"
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_PATH="${BACKUP_DIR}/${TIMESTAMP}"
-mkdir -p "$BACKUP_PATH"
+KEEP="${BACKUP_KEEP:-7}"
+TS=$(date +%Y%m%d-%H%M%S)
+mkdir -p "$BACKUP_DIR"
 
-if is_docker_mode; then
-  [ -f .env ] && source .env
+WORK=$(mktemp -d)
+chmod 700 "$WORK"
+trap 'rm -rf "$WORK"' EXIT
 
-  echo "[1/3] Dumping PostgreSQL..."
-  docker compose exec -T postgres \
-    pg_dump -U "${POSTGRES_USER:-gbrain}" "${POSTGRES_DB:-gbrain}" \
-    > "${BACKUP_PATH}/gbrain.sql"
-  echo "  -> ${BACKUP_PATH}/gbrain.sql"
+echo "[1/3] Dumping PostgreSQL..."
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-gbrain}" "${POSTGRES_DB:-gbrain}" > "${WORK}/gbrain.sql"
 
-  echo "[2/3] Archiving brain repo..."
-  docker compose run --rm -v "$(pwd)/${BACKUP_PATH}:/backup" gbrain \
-    tar czf /backup/brain-repo.tar.gz -C /root .gbrain 2>/dev/null || \
-    docker cp "$(docker compose ps -q gbrain):/root/.gbrain" "${BACKUP_PATH}/brain-repo" 2>/dev/null || \
-    echo "  [skip] brain repo volume empty or service not running"
-  echo "  -> ${BACKUP_PATH}/"
+echo "[2/3] Archiving brain data..."
+docker compose exec -T gbrain tar czf - -C /root .gbrain > "${WORK}/brain-data.tar.gz" 2>/dev/null \
+  || warn "brain data archive empty or gbrain not running"
 
-  echo "[3/3] Saving config..."
-  cp .env "${BACKUP_PATH}/.env.backup"
-else
-  info "Backing up local deployment..."
+cp .env "${WORK}/.env.backup"
 
-  PG_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):.*|\1|p')
-  PG_PORT_LOCAL=$(echo "$DATABASE_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-  PG_DB_LOCAL=$(echo "$DATABASE_URL" | sed -n 's|.*/\(.*\)|\1|p')
+echo "[3/3] Encrypting bundle..."
+OUT="${BACKUP_DIR}/gbrain-${TS}.tar.enc"
+tar czf - -C "$WORK" gbrain.sql brain-data.tar.gz .env.backup \
+  | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass pass:"${BACKUP_PASSPHRASE}" -out "$OUT"
 
-  echo "[1/3] Dumping PostgreSQL..."
-  pg_dump -h "$PG_HOST" -p "$PG_PORT_LOCAL" "$PG_DB_LOCAL" > "${BACKUP_PATH}/gbrain.sql" 2>/dev/null || \
-    warn "pg_dump failed (is PostgreSQL running?)"
-  echo "  -> ${BACKUP_PATH}/gbrain.sql"
+ln -sfn "gbrain-${TS}.tar.enc" "${BACKUP_DIR}/latest"
 
-  echo "[2/3] Archiving brain data..."
-  if [ -d "$HOME/.gbrain" ]; then
-    tar czf "${BACKUP_PATH}/brain-data.tar.gz" -C "$HOME" .gbrain
-    echo "  -> ${BACKUP_PATH}/brain-data.tar.gz"
-  else
-    echo "  [skip] $HOME/.gbrain not found"
-  fi
+# Rotation: keep newest $KEEP
+ls -1t "${BACKUP_DIR}"/gbrain-*.tar.enc 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
+  rm -f "$old"
+done
 
-  echo "[3/3] Saving config..."
-  cp "$HOME/.gbrain-deploy/.env.local" "${BACKUP_PATH}/.env.backup"
-fi
-
-LATEST="${BACKUP_DIR}/latest"
-rm -f "$LATEST"
-ln -s "$BACKUP_PATH" "$LATEST"
-
-TOTAL=$(du -sh "$BACKUP_PATH" | cut -f1)
+SIZE=$(du -h "$OUT" | cut -f1)
 echo ""
-ok "Backup: ${BACKUP_PATH} (${TOTAL})"
-echo -e "  Restore: ${BOLD}gbrain.sh restore ${BACKUP_PATH}${NC}"
+ok "Backup: ${OUT} (${SIZE}, encrypted)"
+echo -e "  Restore: ${BOLD}gbrain.sh restore ${OUT}${NC}"
+echo -e "  ${DIM}Keeping newest ${KEEP}; off-host copy: scp ${OUT} <dest>${NC}"
